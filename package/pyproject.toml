@@ -1,0 +1,16 @@
+[project]
+name = "transformer4sne"
+version = "0.0.1"
+dependencies = []
+description = "A boilerplate package with transformers for data from supernoave science"
+authors = [
+    { name="Yunyi Shen", email="yshen99@mit.edu" }
+]
+license = { text = "MIT" }
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["transformer4sne"]
