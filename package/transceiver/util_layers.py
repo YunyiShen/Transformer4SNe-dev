@@ -259,15 +259,73 @@ class TransformerBlock(nn.Module):
         return x
 
 ########### image use ############
-class PatchEmbed(nn.Module):
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, dim=768):
+import math
+
+class SinusoidalPositionalEmbedding2D(nn.Module):
+    def __init__(self, d_model: int, height: int, width: int):
+        """
+        2D sinusoidal positional embedding FOR IMAGE.
+
+        Args:
+            d_model (int): Embedding dimension. Must be divisible by 4.
+            height (int): Height of the image/grid.
+            width (int): Width of the image/grid.
+            device (str): PyTorch device.
+        """
         super().__init__()
-        self.proj = nn.Conv2d(in_chans, dim, kernel_size=patch_size, stride=patch_size)
+        if d_model % 4 != 0:
+            raise ValueError("d_model must be divisible by 4 for 2D sinusoidal embeddings.")
+
+        self.d_model = d_model
+        self.height = height
+        self.width = width
+        pos_embed = self._build_embedding()
+        self.register_buffer('pos_embed', pos_embed, persistent=False)  # (H*W, d_model)
+
+    def _build_embedding(self):
+        H, W = self.height, self.width
+        d_model = self.d_model
+
+        y_embed = torch.arange(H).unsqueeze(1).repeat(1, W)
+        x_embed = torch.arange(W).unsqueeze(0).repeat(H, 1)
+
+        x_embed = x_embed.flatten()  # (H*W,)
+        y_embed = y_embed.flatten()  # (H*W,)
+
+        dim_half = d_model // 2
+        omega = torch.arange(dim_half) / dim_half
+        omega = 1. / (10000 ** omega)  # (d_model/2,)
+
+        out_x = x_embed[:, None] * omega[None, :]
+        out_y = y_embed[:, None] * omega[None, :]
+
+        pos_x = torch.cat([torch.sin(out_x), torch.cos(out_x)], dim=-1)  # (H*W, d_model)
+        pos_y = torch.cat([torch.sin(out_y), torch.cos(out_y)], dim=-1)  # (H*W, d_model)
+
+        pos_embed = pos_x + pos_y  # (H*W, d_model)
+        return pos_embed
+
+    def forward(self):
+        """
+        Returns:
+            Tensor of shape (H*W, d_model): positional embeddings.
+        """
+        return self.pos_embed
+
+
+class PatchEmbedding(nn.Module):
+    def __init__(self, img_size=224, patch_size=16, in_channels=3, embed_dim=128):
+        super().__init__()
+        self.img_size = img_size
+        self.patch_size = patch_size
         self.num_patches = (img_size // patch_size) ** 2
 
+        self.proj = nn.Conv2d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
+    
     def forward(self, x):
-        x = self.proj(x)  # (B, dim, H/patch, W/patch)
-        x = x.flatten(2).transpose(1, 2)  # (B, N, dim)
+        x = self.proj(x)  # shape: [B, embed_dim, H/P, W/P]
+        x = x.flatten(2)  # shape: [B, embed_dim, N]
+        x = x.transpose(1, 2)  # shape: [B, N, embed_dim]
         return x
 
 

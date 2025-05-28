@@ -1,8 +1,8 @@
 [project]
-name = "transformer4sne"
+name = "transceiver"
 version = "0.0.1"
 dependencies = []
-description = "A boilerplate package with transformers for data from supernoave science"
+description = "A boilerplate package with perceiver for transients"
 authors = [
     { name="Yunyi Shen", email="yshen99@mit.edu" }
 ]
@@ -13,4 +13,4 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["transformer4sne"]
+packages = ["transceiver"]
