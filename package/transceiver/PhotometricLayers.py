@@ -2,6 +2,9 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from .util_layers import *
+from .Perceiver import PerceiverEncoder, PerceiverDecoder
+
+
 
 ###############################
 # Transformers for spectra data
