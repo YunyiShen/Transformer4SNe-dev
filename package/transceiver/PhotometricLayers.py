@@ -8,7 +8,7 @@ from .util_layers import *
 ###############################
 
 class photometricTransformerDecoder(nn.Module):
-    def __init__(self, photometry_length,
+    def __init__(self, 
                  bottleneck_dim,
                  num_bands,
                  model_dim = 32,
@@ -22,7 +22,6 @@ class photometricTransformerDecoder(nn.Module):
         '''
         A transformer to decode something (latent) into photometry given time and band
         Args:
-            photometry_length: length of the photometry, number of measurements
             bottleneck_dim: dimension of the thing you want to decode, should be a tensor [batch_size, bottleneck_length, bottleneck_dim]
             num_bands: number of bands, currently embedded as class
             model_dim: dimension the transformer should operate 
@@ -34,7 +33,6 @@ class photometricTransformerDecoder(nn.Module):
             selfattn: if we want self attention to the latent
         '''
         super(photometricTransformerDecoder, self).__init__()
-        self.init_flux_embd = nn.Parameter(torch.randn(photometry_length, model_dim))
         self.transformerblocks = nn.ModuleList( [TransformerBlock(model_dim, 
                                                  num_heads, ff_dim, dropout, selfattn) 
                                                     for _ in range(num_layers)] 
@@ -59,7 +57,7 @@ class photometricTransformerDecoder(nn.Module):
             mask = None
         time_embd = self.sinusoidal_time_embd(time)
         band_embd = self.bandembd(band)
-        x = self.init_flux_embd[None, :, :] + time_embd + band_embd
+        x = time_embd + band_embd
         h = x
         #breakpoint()
         bottleneck = self.contextfc(bottleneck)

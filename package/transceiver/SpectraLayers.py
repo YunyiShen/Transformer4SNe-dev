@@ -9,7 +9,7 @@ from .util_layers import * # useful base layers
 
 
 class spectraTransformerDecoder(nn.Module):
-    def __init__(self, spectra_length,
+    def __init__(self,
                  bottleneck_dim,
                  model_dim = 32, 
                  num_heads = 4, 
@@ -21,7 +21,6 @@ class spectraTransformerDecoder(nn.Module):
         '''
         A transformer to decode something (latent) into spectra given time and band
         Args:
-            spectra_length: length of the spectra, number of measurements
             bottleneck_dim: dimension of the thing you want to decode, should be a tensor [batch_size, bottleneck_length, bottleneck_dim]
             num_bands: number of bands, currently embedded as class
             model_dim: dimension the transformer should operate 
@@ -32,7 +31,6 @@ class spectraTransformerDecoder(nn.Module):
             selfattn: if we want self attention to the latent
         '''
         super(spectraTransformerDecoder, self).__init__()
-        self.init_flux_embd = nn.Parameter(torch.randn(spectra_length, model_dim))
         self.transformerblocks = nn.ModuleList( [TransformerBlock(model_dim, 
                                                  num_heads, ff_dim, dropout, selfattn) 
                                                     for _ in range(num_layers)] 
@@ -54,7 +52,7 @@ class spectraTransformerDecoder(nn.Module):
         '''
         wavelength_embd = self.wavelength_embd_layer(wavelength)
         phase_embd = self.phase_embd_layer(phase[:, None])
-        x =  self.init_flux_embd[None,:,:] + wavelength_embd #+ phase_embd
+        x =  wavelength_embd 
         h = x
         bottleneck = self.contextfc(bottleneck)
         bottleneck = torch.concat([bottleneck, phase_embd], dim=1)
