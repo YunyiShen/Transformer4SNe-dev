@@ -75,7 +75,7 @@ class spectraTransformerDecoder(nn.Module):
             selfattn: if we want self attention to the latent
         '''
         super(spectraTransformerDecoder, self).__init__()
-        self.perceiverdecoder = PerceiverDecoder(
+        self.decoder = PerceiverDecoder(
             bottleneck_dim,
                  1,
                  model_dim, 
@@ -97,7 +97,7 @@ class spectraTransformerDecoder(nn.Module):
             Decoded spectra of shape [batch_size, spectra_length]
         '''
         x, phase_embd = self.wavelengthphaseembd(wavelength, phase)
-        return self.perceiverdecoder(bottleneck, x, phase_embd, mask) # residual connection
+        return self.decoder(bottleneck, x, phase_embd, mask) # residual connection
 
 # this will generate bottleneck, in encoder
 class spectraTransformerEncoder(nn.Module):
@@ -123,7 +123,7 @@ class spectraTransformerEncoder(nn.Module):
 
         '''
         super(spectraTransformerEncoder, self).__init__()
-        self.perceiverencoder = PerceiverEncoder(bottleneck_length,
+        self.encoder = PerceiverEncoder(bottleneck_length,
                  bottleneck_dim,
                  model_dim, 
                  num_heads, 
@@ -145,7 +145,7 @@ class spectraTransformerEncoder(nn.Module):
             Encoded spectra of shape [batch_size, bottleneck_length, bottleneck_dim]
         '''
         x = self.spectraEmbd(wavelength, flux, phase)
-        x = self.perceiverencoder(x, mask)
+        x = self.encoder(x, mask)
         return x
         
 

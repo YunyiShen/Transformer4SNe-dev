@@ -82,7 +82,7 @@ class PerceiverDecoder(nn.Module):
         self.outputfc = singlelayerMLP(model_dim, out_dim)
     
 
-    def forward(self, bottleneck, x, aux, mask = None):
+    def forward(self, bottleneck, x, aux = None, mask = None):
         '''
         Arg:
             bottleneck: bottleneck representation

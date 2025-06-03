@@ -9,6 +9,35 @@ from .Perceiver import PerceiverEncoder, PerceiverDecoder
 ###############################
 # Transformers for spectra data
 ###############################
+class timebandEmbedding(nn.Module):
+    def __init__(self, num_bands = 6, model_dim = 32):
+        self.time_embd = SinusoidalMLPPositionalEmbedding(model_dim)
+        self.bandembd = nn.Embedding(num_bands, model_dim)
+    
+    def forward(self, time, band):
+        return self.time_embd(time) + self.bandembd(band)
+
+
+
+class photometryEmbedding(nn.Module):
+    def __init__(self, num_bands = 6, model_dim = 32):
+        self.time_band_embd = timebandEmbedding(num_bands, model_dim)
+        self.fluxfc = nn.Linear(1, model_dim)
+
+    def forward(self, flux, time, band):
+        '''
+        Args:
+            flux: flux (potentially transformed) of the photometry being taken [batch_size, photometry_length]
+            time: time (potentially transformed) of the photometry being taken [batch_size, photometry_length]
+            band: band of the photometry being taken [batch_size, photometry_length]
+        Return:
+            encoding of size [batch_size, bottleneck_length, bottleneck_dim]
+
+        '''
+        return (self.fluxfc(flux[:, :, None]) + self.time_band_embd(time, band))
+
+
+
 
 class photometricTransformerDecoder(nn.Module):
     def __init__(self, 
@@ -36,15 +65,17 @@ class photometricTransformerDecoder(nn.Module):
             selfattn: if we want self attention to the latent
         '''
         super(photometricTransformerDecoder, self).__init__()
-        self.transformerblocks = nn.ModuleList( [TransformerBlock(model_dim, 
-                                                 num_heads, ff_dim, dropout, selfattn) 
-                                                    for _ in range(num_layers)] 
-                                                )
-        self.model_dim = model_dim
-        self.sinusoidal_time_embd = SinusoidalMLPPositionalEmbedding(model_dim)
-        self.bandembd = nn.Embedding(num_bands, model_dim)
-        self.contextfc = MLP(bottleneck_dim, model_dim, [model_dim]) # expand bottleneck to flux and time
-        self.get_photo = singlelayerMLP(model_dim, 1)
+        self.decoder = PerceiverDecoder(
+            bottleneck_dim,
+                 1,
+                 model_dim, 
+                 num_heads, 
+                 ff_dim, 
+                 num_layers,
+                 dropout, 
+                 selfattn
+        )
+        self.time_band_embd = timebandEmbedding(num_bands, model_dim)
         self.donotmask = donotmask
     
     def forward(self, time, band, bottleneck, mask=None):
@@ -58,16 +89,9 @@ class photometricTransformerDecoder(nn.Module):
         '''
         if self.donotmask:
             mask = None
-        time_embd = self.sinusoidal_time_embd(time)
-        band_embd = self.bandembd(band)
-        x = time_embd + band_embd
-        h = x
-        #breakpoint()
-        bottleneck = self.contextfc(bottleneck)
-        for transformerblock in self.transformerblocks:
-            h = transformerblock(h, bottleneck, mask=mask)
-        x = x + h # residual connection
-        return self.get_photo(x).squeeze(-1) # get flux
+        x = self.time_band_embd(time, band)
+        self.decoder(bottleneck, x, None, mask)
+        return 
 
 # this will generate bottleneck, in encoder
 class photometricTransformerEncoder(nn.Module):
@@ -96,16 +120,15 @@ class photometricTransformerEncoder(nn.Module):
 
         '''
         super(photometricTransformerEncoder, self).__init__()
-        self.model_dim = model_dim
-        self.time_embd = SinusoidalMLPPositionalEmbedding(model_dim)
-        self.initbottleneck = nn.Parameter(torch.randn(bottleneck_length, model_dim))
-        self.bottleneckfc = singlelayerMLP(model_dim, bottleneck_dim)
-        self.transformerblocks =  nn.ModuleList( [TransformerBlock(model_dim, 
-                                                    num_heads, ff_dim, dropout, selfattn) 
-                                                 for _ in range(num_layers)] )
-        
-        self.bandembd = nn.Embedding(num_bands, model_dim)
-        self.fluxfc = nn.Linear(1, model_dim)
+        self.encoder = PerceiverEncoder(bottleneck_length,
+                 bottleneck_dim,
+                 model_dim, 
+                 num_heads, 
+                 num_layers,
+                 ff_dim, 
+                 dropout, 
+                 selfattn)
+        self.photometry_embd = photometryEmbedding(num_bands, model_dim)
 
 
     def forward(self, flux, time, band, mask=None):
@@ -118,15 +141,7 @@ class photometricTransformerEncoder(nn.Module):
             encoding of size [batch_size, bottleneck_length, bottleneck_dim]
 
         '''
-        photomety_embdding = (self.fluxfc(flux[:, :, None]) + 
-                              self.time_embd(time) + 
-                              self.bandembd(band))
-
-        x = self.initbottleneck[None, :, :]
-        x = x.repeat(flux.shape[0], 1, 1) # repeat for all batch
-        h = x
-        for transformerblock in self.transformerblocks:
-            h = transformerblock(h, photomety_embdding, mask = None, # do not mask latent representation
-                                 context_mask=mask)
-        return self.bottleneckfc(x+h) # residual connection
+        
+        x = self.photometry_embd(flux, time, band)
+        return self.encoder(x, mask) 
         
