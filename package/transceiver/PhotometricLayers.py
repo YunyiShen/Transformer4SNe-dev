@@ -7,10 +7,11 @@ from .Perceiver import PerceiverEncoder, PerceiverDecoder
 
 
 ###############################
-# Transformers for spectra data
+# Transceivers for spectra data
 ###############################
 class timebandEmbedding(nn.Module):
     def __init__(self, num_bands = 6, model_dim = 32):
+        super(timebandEmbedding, self).__init__()
         self.time_embd = SinusoidalMLPPositionalEmbedding(model_dim)
         self.bandembd = nn.Embedding(num_bands, model_dim)
     
@@ -21,6 +22,7 @@ class timebandEmbedding(nn.Module):
 
 class photometryEmbedding(nn.Module):
     def __init__(self, num_bands = 6, model_dim = 32):
+        super(photometryEmbedding, self).__init__()
         self.time_band_embd = timebandEmbedding(num_bands, model_dim)
         self.fluxfc = nn.Linear(1, model_dim)
 
@@ -39,7 +41,7 @@ class photometryEmbedding(nn.Module):
 
 
 
-class photometricTransformerDecoder(nn.Module):
+class photometricTransceiverDecoder(nn.Module):
     def __init__(self, 
                  bottleneck_dim,
                  num_bands,
@@ -64,7 +66,7 @@ class photometricTransformerDecoder(nn.Module):
             donotmask: should we ignore the mask when decoding?
             selfattn: if we want self attention to the latent
         '''
-        super(photometricTransformerDecoder, self).__init__()
+        super(photometricTransceiverDecoder, self).__init__()
         self.decoder = PerceiverDecoder(
             bottleneck_dim,
                  1,
@@ -90,11 +92,11 @@ class photometricTransformerDecoder(nn.Module):
         if self.donotmask:
             mask = None
         x = self.time_band_embd(time, band)
-        self.decoder(bottleneck, x, None, mask)
-        return 
+        return self.decoder(bottleneck, x, None, mask).squeeze(-1)
+         
 
 # this will generate bottleneck, in encoder
-class photometricTransformerEncoder(nn.Module):
+class photometricTransceiverEncoder(nn.Module):
     def __init__(self,
                  num_bands, 
                  bottleneck_length,
@@ -106,7 +108,7 @@ class photometricTransformerEncoder(nn.Module):
                  dropout=0.1,
                  selfattn=False):
         '''
-        Transformer encoder for photometry, with cross attention pooling
+        Transceiver encoder for photometry, with cross attention pooling
         Args:
             num_bands: number of bands, currently embedded as class
             bottleneck_length: LCs are encoded as a sequence of size [bottleneck_length, bottleneck_dim]
@@ -119,7 +121,7 @@ class photometricTransformerEncoder(nn.Module):
             selfattn: if we want self attention to the given LC
 
         '''
-        super(photometricTransformerEncoder, self).__init__()
+        super(photometricTransceiverEncoder, self).__init__()
         self.encoder = PerceiverEncoder(bottleneck_length,
                  bottleneck_dim,
                  model_dim, 

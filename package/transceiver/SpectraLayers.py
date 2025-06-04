@@ -5,7 +5,7 @@ from .util_layers import * # useful base layers
 from .Perceiver import PerceiverEncoder, PerceiverDecoder
 
 ###############################
-# Transformers for spectra data
+# Transceivers for spectra data
 ###############################
 
 class wavelengthphaseEmbedding(nn.Module):
@@ -16,6 +16,7 @@ class wavelengthphaseEmbedding(nn.Module):
         '''
         Arg model_dim: model dimension
         '''
+        super(wavelengthphaseEmbedding, self).__init__()
         self.phase_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)# expand phase to bottleneck
         self.wavelength_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)
     
@@ -35,6 +36,7 @@ class spectraEmbedding(nn.Module):
             linear embedding of flux, the append in seq space of phase
         Arg: model_dim: model dimension
         '''
+        super(spectraEmbedding, self).__init__()
         self.phase_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)# expand phase to bottleneck
         self.wavelength_embd_layer = SinusoidalMLPPositionalEmbedding(model_dim)# expand wavelength to bottleneck
         self.flux_embd = nn.Linear(1, model_dim)
@@ -52,7 +54,7 @@ class spectraEmbedding(nn.Module):
 
 
 
-class spectraTransformerDecoder(nn.Module):
+class spectraTransceiverDecoder(nn.Module):
     def __init__(self,
                  bottleneck_dim,
                  model_dim = 32, 
@@ -74,7 +76,7 @@ class spectraTransformerDecoder(nn.Module):
             dropout: drop out in transformer
             selfattn: if we want self attention to the latent
         '''
-        super(spectraTransformerDecoder, self).__init__()
+        super(spectraTransceiverDecoder, self).__init__()
         self.decoder = PerceiverDecoder(
             bottleneck_dim,
                  1,
@@ -97,20 +99,20 @@ class spectraTransformerDecoder(nn.Module):
             Decoded spectra of shape [batch_size, spectra_length]
         '''
         x, phase_embd = self.wavelengthphaseembd(wavelength, phase)
-        return self.decoder(bottleneck, x, phase_embd, mask) # residual connection
+        return self.decoder(bottleneck, x, phase_embd, mask).squeeze(-1) # residual connection
 
 # this will generate bottleneck, in encoder
-class spectraTransformerEncoder(nn.Module):
+class spectraTransceiverEncoder(nn.Module):
     def __init__(self, bottleneck_length,
                  bottleneck_dim,
-                 model_dim, 
-                 num_heads, 
-                 num_layers,
-                 ff_dim, 
+                 model_dim = 32, 
+                 num_heads = 4, 
+                 num_layers = 4,
+                 ff_dim = 32, 
                  dropout = 0.1, 
                  selfattn = False):
         '''
-        Transformer encoder for spectra, with cross attention pooling
+        Transceiver encoder for spectra, with cross attention pooling
         Args:
             bottleneck_length: spectra are encoded as a sequence of size [bottleneck_length, bottleneck_dim]
             bottleneck_dim: spectra are encoded as a sequence of size [bottleneck_length, bottleneck_dim]
@@ -122,7 +124,7 @@ class spectraTransformerEncoder(nn.Module):
             selfattn: if we want self attention to the given spectra
 
         '''
-        super(spectraTransformerEncoder, self).__init__()
+        super(spectraTransceiverEncoder, self).__init__()
         self.encoder = PerceiverEncoder(bottleneck_length,
                  bottleneck_dim,
                  model_dim, 
@@ -145,6 +147,9 @@ class spectraTransformerEncoder(nn.Module):
             Encoded spectra of shape [batch_size, bottleneck_length, bottleneck_dim]
         '''
         x = self.spectraEmbd(wavelength, flux, phase)
+        if mask is not None:
+           # add a false at end to account for the added phase embd
+           mask = torch.cat([mask, torch.zeros(mask.shape[0], 1).bool().to(mask.device) ], dim=1)
         x = self.encoder(x, mask)
         return x
         

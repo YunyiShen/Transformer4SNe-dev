@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 from .util_layers import *
 import math
-from Perceiver import PerceiverEncoder, PerceiverDecoder
+from .Perceiver import PerceiverEncoder, PerceiverDecoder
 
-class HostImgTransformerEncoder(nn.Module):
+class HostImgTransceiverEncoder(nn.Module):
     def __init__(self, 
                     img_size,
                     bottleneck_length,
@@ -51,7 +51,7 @@ class HostImgTransformerEncoder(nn.Module):
 
         '''
         self.initbottleneck = nn.Parameter(torch.randn(bottleneck_length, model_dim))
-        self.transformerblocks =  nn.ModuleList( [TransformerBlock(model_dim, 
+        self.transformerblocks =  nn.ModuleList( [TransceiverBlock(model_dim, 
                                                     num_heads, ff_dim, dropout, selfattn) 
                                                  for _ in range(num_layers)] )
         
@@ -90,7 +90,7 @@ class HostImgTransformerEncoder(nn.Module):
         return self.encoder(x)
 
 
-class HostImgTransformerDecoder(nn.Module):
+class HostImgTransceiverDecoder(nn.Module):
     def __init__(self,
                 img_size,
                 bottleneck_dim,
@@ -117,11 +117,12 @@ class HostImgTransformerDecoder(nn.Module):
         super().__init__()
         self.img_size = img_size
         self.in_channels = in_channels
+        self.init_img_embd = SinusoidalPositionalEmbedding2D(model_dim, img_size, img_size) #nn.Parameter(torch.randn(img_size ** 2, model_dim))
 
         '''
         self.contextfc = MLP(bottleneck_dim, model_dim, [model_dim])
-        self.init_img_embd = SinusoidalPositionalEmbedding2D(model_dim, img_size, img_size) #nn.Parameter(torch.randn(img_size ** 2, model_dim))
-        self.transformerblocks = nn.ModuleList( [TransformerBlock(model_dim, 
+        
+        self.transformerblocks = nn.ModuleList( [TransceiverBlock(model_dim, 
                                                  num_heads, ff_dim, dropout, selfattn) 
                                                     for _ in range(num_layers)] )
         
@@ -132,7 +133,7 @@ class HostImgTransformerDecoder(nn.Module):
         '''
         self.decoder = PerceiverDecoder(
             bottleneck_dim,
-                 model_dim * img_size * img_size,
+                 in_channels, #* img_size * img_size,
                  model_dim, 
                  num_heads, 
                  ff_dim, 
@@ -157,7 +158,7 @@ class HostImgTransformerDecoder(nn.Module):
 
 
 
-class HostImgTransformerDecoderHybrid(nn.Module):
+class HostImgTransceiverDecoderHybrid(nn.Module):
     def __init__(self,
                  img_size,
                  bottleneck_dim,
@@ -204,7 +205,7 @@ class HostImgTransformerDecoderHybrid(nn.Module):
         self.contextfc = MLP(bottleneck_dim, model_dim, [model_dim])
         # transformer blocks
         self.transformerblocks = nn.ModuleList([
-            TransformerBlock(model_dim, num_heads, ff_dim, dropout, selfattn)
+            TransceiverBlock(model_dim, num_heads, ff_dim, dropout, selfattn)
             for _ in range(num_layers)
         ])
         # each token outputs a small image patch (flattened)
