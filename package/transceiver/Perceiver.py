@@ -47,7 +47,7 @@ class PerceiverEncoder(nn.Module):
         h = out
         for transformerblock in self.transformerblocks:
             h = transformerblock(h, x, context_mask=mask)
-        return self.bottleneckfc(out+h) # residual connection
+        return self.bottleneckfc(h) # residual connection
 
 class PerceiverDecoder(nn.Module):
     def __init__(self,
@@ -98,5 +98,5 @@ class PerceiverDecoder(nn.Module):
             bottleneck = torch.concat([bottleneck, aux], dim=1)
         for transformerblock in self.transformerblocks:
             h = transformerblock(h, bottleneck, mask=mask)
-        return self.outputfc(x + h)
+        return self.outputfc(h)
 
